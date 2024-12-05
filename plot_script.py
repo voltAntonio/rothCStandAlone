@@ -114,7 +114,7 @@ axs[2][0].tick_params(axis='y', labelsize=20)
 
 plt.tight_layout()
 plt.show()
-fig.savefig('month_results.png')
+fig.savefig('Cmonth_results.png')
 
 
 df = pd.read_csv('C:/Github/rothCStandAlone/year_results.csv')
@@ -223,4 +223,4 @@ axs[2][0].tick_params(axis='y', labelsize=20)
 
 plt.tight_layout()
 plt.show()
-fig.savefig('year_results.png')
+fig.savefig('Cyear_results.png')

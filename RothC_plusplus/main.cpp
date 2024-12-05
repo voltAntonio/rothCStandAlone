@@ -218,7 +218,6 @@ std::vector<std::vector<double>> leggi_csv(const std::string& nome_file) {
     }
 
     std::string linea;
-
     std::getline(file, linea);
 
     while (std::getline(file, linea)) {
