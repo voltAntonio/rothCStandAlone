@@ -107,7 +107,7 @@ def RMF_PC (PC):
 def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
            BIO_Rage, HUM_Rage, Total_Rage, modernC, RateM, clay, C_Inp, FYM_Inp, DPM_RPM):
 
-    zero = 0e-8
+    zero = 1e-8
 # rate constant are params so don't need to be passed
     DPM_k = 10.0
     RPM_k = 0.3
@@ -218,30 +218,30 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
 
 # calculate rage of each pool.      
     if(DPM[0]<=zero): 
-        DPM_Rage[0] = zero
+        DPM_Rage[0] = 0.0
     else:
         DPM_Rage[0] = ( np.log(DPM[0]/DPM_Ract_new) ) / conr
 
     
     if(RPM[0]<=zero):
-        RPM_Rage[0] = zero
+        RPM_Rage[0] = 0.0
     else:
         RPM_Rage[0] = (np.log(RPM/RPM_Ract_new) ) / conr 
     
     if(BIO[0]<=zero):
-        BIO_Rage[0] = zero
+        BIO_Rage[0] = 0.0
     else:
         BIO_Rage[0] = ( np.log(BIO/BIO_Ract_new) ) / conr
     
     
     if(HUM[0]<=zero):
-        HUM_Rage[0] = zero
+        HUM_Rage[0] = 0.0
     else:
         HUM_Rage[0] = ( np.log(HUM/HUM_Ract_new) ) / conr
     
     
     if(SOC[0]<=zero):
-        Total_Rage[0] = zero
+        Total_Rage[0] = 0.0
     else:
         Total_Rage[0] = ( np.log(SOC[0]/Total_Ract) ) / conr    
     
@@ -297,7 +297,6 @@ depth = df_head.loc[0,"depth"]
 IOM = [df_head.loc[0,"iom"]]
 nsteps = df_head.loc[0,"nsteps"]
 df = pd.read_csv('RothC_input.dat', skiprows = 6, header = 0, index_col=None, delim_whitespace=True)
-print (df)
 df.columns =['t_year', 't_month', 't_mod', 't_tmp','t_rain','t_evap', 't_C_Inp', 't_FYM_Inp', 't_PC', 't_DPM_RPM']
   
        
@@ -344,9 +343,10 @@ while (test > 1E-6):
          
 Total_Delta = (np.exp(-Total_Rage[0]/8035.0) - 1.0) * 1000.0     
       
-print( j, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], Total_Delta)
+#print( j, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], Total_Delta)
 
-year_list = [[1, j+1, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], Total_Delta[0]]]
+year_list = []
+#year_list = [[1, j+1, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], Total_Delta[0]]]
 
 month_list = []        
 
@@ -369,14 +369,14 @@ for  i in range(timeFact, nsteps):
          
     Total_Delta = (np.exp(-Total_Rage[0]/8035.0) - 1.0) * 1000.0
     
-    print(C_Inp, FYM_Inp, TEMP, RAIN, PEVAP, SWC[0],  PC,  DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], SOC[0])
+    #print(C_Inp, FYM_Inp, TEMP, RAIN, PEVAP, SWC[0],  PC,  DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], SOC[0])
     
     month_list.insert(i-timeFact, [df.loc[i,"t_year"],df.loc[i,"t_month"], DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], SOC[0], Total_Delta[0]])
         
     if(df.t_month[i] == timeFact):
         timeFact_index = int(i/timeFact)   
         year_list.insert(timeFact_index, [df.loc[i,"t_year"],df.loc[i,"t_month"], DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], SOC[0], Total_Delta[0]])
-        print( i, DPM, RPM, BIO, HUM, IOM, SOC, Total_Delta)
+        #print( i, DPM, RPM, BIO, HUM, IOM, SOC, Total_Delta)
 
 output_years = pd.DataFrame(year_list, columns=["Year","Month","DPM_t_C_ha","RPM_t_C_ha","BIO_t_C_ha","HUM_t_C_ha","IOM_t_C_ha","SOC_t_C_ha","deltaC"])     
 output_months = pd.DataFrame(month_list, columns=["Year","Month","DPM_t_C_ha","RPM_t_C_ha","BIO_t_C_ha","HUM_t_C_ha","IOM_t_C_ha","SOC_t_C_ha","deltaC"])

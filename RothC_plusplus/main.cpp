@@ -11,9 +11,9 @@ using namespace std;
 #include <cmath>
 
 // Calculates the plant retainment modifying factor (RMF_PC)
-double RMF_PC(double PC) {
+double RMF_PC(bool PC) {
     double RM_PC;
-    if (fabs(PC) < EPSILON) {
+    if (! PC) {
         RM_PC = 1.0;
     } else {
         RM_PC = 0.6;
@@ -22,7 +22,7 @@ double RMF_PC(double PC) {
 }
 
 // Calculates the rate modifying factor for moisture (RMF_Moist)
-double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, double PC, double SWC) {
+double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, bool PC, double &SWC) {
     double RMFMax = 1.0;
     double RMFMin = 0.2;
 
@@ -36,7 +36,7 @@ double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, double PC
 
     double minSWCDF = std::min(0.0, SWC + DF);
     double minSMDBareSWC = std::min(SMDBare, SWC);
-    if (PC == 1) {  // valutare questo if
+    if (PC) {
         SWC = std::max(SMDMaxAdj, minSWCDF);
     } else {
         SWC = std::max(minSMDBareSWC, minSWCDF);
@@ -161,30 +161,30 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 
     //calculate rage of each pool
     if (DPM <= EPSILON)
-        DPM_Rage = EPSILON;
+        DPM_Rage = 0;
     else
         DPM_Rage = (std::log(DPM/DPM_Ract_new) ) / conr;
 
 
     if(RPM <= EPSILON)
-        RPM_Rage = EPSILON;
+        RPM_Rage = 0;
     else
         RPM_Rage = (std::log(RPM/RPM_Ract_new) ) / conr;
 
     if(BIO <= EPSILON)
-        BIO_Rage = EPSILON;
+        BIO_Rage = 0;
     else
         BIO_Rage = ( std::log(BIO/BIO_Ract_new) ) / conr;
 
 
     if(HUM <= EPSILON)
-        HUM_Rage = EPSILON;
+        HUM_Rage = 0;
     else
         HUM_Rage = ( std::log(HUM/HUM_Ract_new) ) / conr;
 
 
     if(SOC <= EPSILON)
-        Total_Rage = EPSILON;
+        Total_Rage = 0;
     else
         Total_Rage = ( std::log(SOC/Total_Ract) ) / conr;
 
@@ -192,7 +192,7 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 }
 
 // The Rothamsted Carbon Model: RothC
-void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &PEVAP, double &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
+void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &PEVAP, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
     // Calculate RMFs
     double RM_TMP = RMF_Tmp(TEMP);
     double RM_Moist = RMF_Moist(RAIN, PEVAP, clay, depth, PC, SWC);
@@ -305,7 +305,7 @@ int main()
     double TEMP;
     double RAIN;
     double PEVAP;
-    double PC;
+    bool PC;
     double DPM_RPM;
     double C_Inp;
     double FYM_Inp;
@@ -322,7 +322,7 @@ int main()
         TEMP = data[k][3];
         RAIN = data[k][4];
         PEVAP = data[k][5];
-        PC = data[k][8];
+        PC = bool(data[k][8]);
         DPM_RPM = data[k][9];
         C_Inp = data[k][6];
         FYM_Inp = data[k][7];
@@ -340,12 +340,20 @@ int main()
         }
     }
 
-    double Total_Delta = (std::exp(-Total_Rage/8035.0) - 1) * 1000;
+    double totalDelta = (std::exp(-Total_Rage/8035.0) - 1) * 1000;
 
-    std::cout << j << "," << DPM << "," << RPM << "," << BIO << "," << HUM << "," << SOC << "," << Total_Delta << "\n";
+    std::cout << j << "," << DPM << "," << RPM << "," << BIO << "," << HUM << "," << SOC << "," << totalDelta << "\n";
 
     std::vector<std::vector<double>> yearList;
-//    std::vector<std::vector<double>> yearList = {{double(1), double(j+1), DPM, RPM, BIO, HUM, IOM, SOC, Total_Delta}};
+//    std::vector<std::vector<double>> yearList = {{double(1), double(j+1), DPM, RPM, BIO, HUM, IOM, SOC, totalDelta}};
+
+    /*DPM = 0.14546618698414296;
+    RPM = 5.678120858752452;
+    BIO = 0.7405937979752077;
+    HUM = 27.642769420831222;
+    IOM = 3.0041;
+    SOC = 37.211050264543026;
+    totalDelta = -93.34988833;*/
 
     std::vector<std::vector<double>> monthList;
     int timeFactIndex;
@@ -355,7 +363,7 @@ int main()
         TEMP = data[i][3];
         RAIN = data[i][4];
         PEVAP = data[i][5];
-        PC = data[i][8];
+        PC = bool(data[i][8]);
         DPM_RPM = data[i][9];
         C_Inp = data[i][6];
         FYM_Inp = data[i][7];
@@ -363,18 +371,18 @@ int main()
 
         RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
 
-        Total_Delta = (std::exp(-Total_Rage/8035.0) - 1.0) * 1000;
+        totalDelta = (std::exp(-Total_Rage/8035.0) - 1.0) * 1000;
 
-        std::cout << C_Inp << "," << FYM_Inp << "," << TEMP << "," << RAIN << "," << PEVAP << "," << SWC << ","
-                  << PC << "," << DPM <<"," << RPM <<"," << BIO <<"," << HUM <<"," << IOM <<"," << SOC << "\n";
+        //std::cout << C_Inp << "," << FYM_Inp << "," << TEMP << "," << RAIN << "," << PEVAP << "," << SWC << ","
+                  //<< PC << "," << DPM <<"," << RPM <<"," << BIO <<"," << HUM <<"," << IOM <<"," << SOC << "\n";
 
-        monthList.push_back({double(i-timeFact), double(data[i][0]), double(data[i][1]), DPM, RPM, BIO, HUM, IOM, SOC, Total_Delta});
+        monthList.push_back({double(i-timeFact), double(data[i][0]), double(data[i][1]), DPM, RPM, BIO, HUM, IOM, SOC, totalDelta});
 
         if (int(data[i][1]) == timeFact)
         {
             timeFactIndex = int(i/timeFact);
-            yearList.push_back({double(timeFactIndex), data[i][0], data[i][1], DPM, RPM, BIO, HUM, IOM, SOC, Total_Delta});
-            std::cout << i << "," << DPM << "," << RPM << "," << BIO << "," << HUM << "," << IOM << "," << SOC << "," << Total_Delta << "\n";
+            yearList.push_back({double(timeFactIndex), data[i][0], data[i][1], DPM, RPM, BIO, HUM, IOM, SOC, totalDelta});
+            //std::cout << i << "," << DPM << "," << RPM << "," << BIO << "," << HUM << "," << IOM << "," << SOC << "," << totalDelta << "\n";
         }
     }
 
