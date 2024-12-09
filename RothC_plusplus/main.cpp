@@ -13,7 +13,7 @@ using namespace std;
 // Calculates the plant retainment modifying factor (RMF_PC)
 double RMF_PC(double PC) {
     double RM_PC;
-    if (PC == 0) {
+    if (fabs(PC) < EPSILON) {
         RM_PC = 1.0;
     } else {
         RM_PC = 0.6;
@@ -36,7 +36,7 @@ double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, double PC
 
     double minSWCDF = std::min(0.0, SWC + DF);
     double minSMDBareSWC = std::min(SMDBare, SWC);
-    if (PC == 1) {
+    if (PC == 1) {  // valutare questo if
         SWC = std::max(SMDMaxAdj, minSWCDF);
     } else {
         SWC = std::max(minSMDBareSWC, minSWCDF);
@@ -63,12 +63,12 @@ double RMF_Tmp(double TEMP) {
 
 void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &RateM, double &clay, double &C_Inp, double &FYM_Inp, double &DPM_RPM)
 {
-    double DPM_k = 10.0;
-    double RPM_k = 0.3;
-    double BIO_k = 0.66;
-    double HUM_k = 0.02;
+    const double DPM_k = 10.0;
+    const double RPM_k = 0.3;
+    const double BIO_k = 0.66;
+    const double HUM_k = 0.02;
 
-    double conr = std::log(2.0)/5568.0;
+    const double conr = std::log(2.0)/5568.0;
     double tstep = 1.0/timeFact; //monthly 1/12 or daily 1/365
     double exc = std::exp(-conr*tstep);
 
