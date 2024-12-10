@@ -61,7 +61,7 @@ double RMF_Tmp(double TEMP) {
     return RM_TMP;
 }
 
-void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &RateM, double &clay, double &C_Inp, double &FYM_Inp, double &DPM_RPM)
+void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &RateM, double clay, double C_Inp, double FYM_Inp, double &DPM_RPM)
 {
     const double DPM_k = 10.0;
     const double RPM_k = 0.3;
@@ -192,7 +192,7 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 }
 
 // The Rothamsted Carbon Model: RothC
-void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &PEVAP, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
+void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double clay, double depth, double TEMP, double RAIN, double PEVAP, bool PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
     // Calculate RMFs
     double RM_TMP = RMF_Tmp(TEMP);
     double RM_Moist = RMF_Moist(RAIN, PEVAP, clay, depth, PC, SWC);

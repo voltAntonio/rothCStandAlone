@@ -24,6 +24,7 @@
 #  FYM:      Farmyard manure input to the soil each month (units: t C /ha)
 #  PC:       Plant cover (0 = no cover, 1 = covered by a crop)
 #  DPM/RPM:  Ratio of DPM to RPM for carbon additions to the soil (units: none)
+#  BC_inp:   biochar input to the soil each month (units: t C/ha)
 #
 #  OUTPUTS:
 #
@@ -35,6 +36,9 @@
 #  Hum:   Humified Organic Matter     (units: t C /ha)
 #  IOM:   Inert Organic Matter        (units: t C /ha)
 #  SOC:   Soil Organic Matter / Total organic Matter (units: t C / ha)
+#  
+#  LAB:   recalcitrant biochar fraction (units: t C /ha)
+#  REC:   labile biochar fraction (units: t C /ha)
 #
 #  DPM_Rage:   radiocarbon age of DPM
 #  RPM_Rage:   radiocarbon age of RPM
@@ -46,8 +50,20 @@
 #  RM_TMP:    rate modifying fator for temperature (0.0 - ~5.0)
 #  RM_Moist:  rate modifying fator for moisture (0.0 - 1.0)
 #  RM_PC:     rate modifying fator for plant retainment (0.6 or 1.0)
-
+#
+#  BIOCHAR:
+#
+#  kREC:      degradation rate of recalcitrant biochar 
+#  kLAB:      degradation rate of labile biochar
+#  k1:        degradation rate of recalcitrant biochar fraction(0.08 yr-1)
+#  k2:        degradation rate of labile biochar fraction(2.55 yr-1)
+#
 ######################################################################################################################
+
+
+
+#funzione bilancio 
+
 
 import pandas as pd
 import numpy as np
@@ -104,8 +120,8 @@ def RMF_PC (PC):
     return RM_PC
 
 # Calculates the decomposition and radiocarbon
-def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
-           BIO_Rage, HUM_Rage, Total_Rage, modernC, RateM, clay, C_Inp, FYM_Inp, DPM_RPM):
+def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, LAB, REC, co2, DPM_Rage, RPM_Rage, \
+           BIO_Rage, HUM_Rage, Total_Rage, modernC, RateM, clay, C_Inp, FYM_Inp, BC_Inp, DPM_RPM):
 
     zero = 1e-8
 # rate constant are params so don't need to be passed
@@ -113,6 +129,14 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
     RPM_k = 0.3
     BIO_k = 0.66
     HUM_k = 0.02 
+    REC_k = 0.08/RateM
+    LAB_k = 2.55/RateM
+    
+    if (LAB[0] > zero or REC[0] > zero):
+        PE = - np.log(0.16) #priming effect factor NOTA
+    else:
+        PE = 1
+    
     
     conr = np.log(2.0) / 5568.0
 
@@ -122,16 +146,20 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
       
  
 # decomposition
-    DPM1 = DPM[0] * np.exp(-RateM*DPM_k*tstep)
-    RPM1 = RPM[0] * np.exp(-RateM*RPM_k*tstep)      
-    BIO1 = BIO[0] * np.exp(-RateM*BIO_k*tstep)      
-    HUM1 = HUM[0] * np.exp(-RateM*HUM_k*tstep) 
+    DPM1 = DPM[0] * np.exp(-RateM*PE*DPM_k*tstep)
+    RPM1 = RPM[0] * np.exp(-RateM*PE*RPM_k*tstep)      
+    BIO1 = BIO[0] * np.exp(-RateM*PE*BIO_k*tstep)      
+    HUM1 = HUM[0] * np.exp(-RateM*PE*HUM_k*tstep) 
+    LAB1 = LAB[0] * np.exp(-LAB_k*tstep) #NOTA
+    REC1 = REC[0] * np.exp(-REC_k*tstep) #NOTA
 
       
     DPM_d = DPM[0] - DPM1
     RPM_d = RPM[0] - RPM1      
     BIO_d = BIO[0] - BIO1
     HUM_d = HUM[0] - HUM1 
+    LAB_d = LAB[0] - LAB1
+    REC_d = REC[0] - REC1
       
     
     x=1.67*(1.85+1.60*np.exp(-0.0786*clay))
@@ -152,6 +180,9 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
     HUM_co2 = HUM_d * (x / (x+1))
     HUM_BIO = HUM_d * (0.46 / (x+1))
     HUM_HUM = HUM_d * (0.54 / (x+1))  
+    
+    LAB_co2 = LAB_d
+    REC_co2 = REC_d
            
       
 # update C pools  
@@ -159,6 +190,11 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
     RPM[0] = RPM1
     BIO[0] = BIO1 + DPM_BIO + RPM_BIO + BIO_BIO + HUM_BIO
     HUM[0] = HUM1 + DPM_HUM + RPM_HUM + BIO_HUM + HUM_HUM    
+    
+    LAB[0] = LAB1
+    REC[0] = REC1
+    
+    co2[0] = DPM_co2 + RPM_co2 + BIO_co2 + HUM_co2 + LAB_co2 + REC_co2
       
 # split plant C to DPM and RPM 
     PI_C_DPM = DPM_RPM / (DPM_RPM + 1.0) * C_Inp
@@ -167,12 +203,18 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
 # split FYM C to DPM, RPM and HUM 
     FYM_C_DPM = 0.49*FYM_Inp
     FYM_C_RPM = 0.49*FYM_Inp      
-    FYM_C_HUM = 0.02*FYM_Inp   
+    FYM_C_HUM = 0.02*FYM_Inp  #NOTA: aggiunta considerata alla fine dello step?
+    
+    BC_Inp_C_LAB = 0.4*BC_Inp
+    BC_Inp_C_REC = 0.96*BC_Inp
       
 # add Plant C and FYM_C to DPM, RPM and HUM   
     DPM[0] = DPM[0] + PI_C_DPM + FYM_C_DPM
     RPM[0] = RPM[0] + PI_C_RPM + FYM_C_RPM  
     HUM[0] = HUM[0] + FYM_C_HUM
+    
+    LAB[0] = LAB[0] + BC_Inp_C_LAB
+    REC[0] = REC[0] + BC_Inp_C_REC
       
 # calc new ract of each pool      
     DPM_Ract = DPM1 *np.exp(-conr*DPM_Rage[0])
@@ -211,7 +253,7 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
                                    RPM_HUM_Ract + BIO_HUM_Ract + HUM_HUM_Ract )*exc  
       
       
-    SOC[0] = DPM[0] + RPM[0] + BIO[0] + HUM[0] + IOM[0]     
+    SOC[0] = DPM[0] + RPM[0] + BIO[0] + HUM[0] + IOM[0] + LAB[0] + REC[0]
       
     Total_Ract = DPM_Ract_new + RPM_Ract_new + BIO_Ract_new + HUM_Ract_new + IOM_Ract
       
@@ -247,9 +289,9 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, \
     
     return
 
-def RothC(timeFact, DPM,RPM,BIO,HUM,IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, \
+def RothC(timeFact, DPM,RPM,BIO,HUM,IOM, SOC, LAB, REC, co2, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, \
                Total_Rage, modernC, clay, depth,TEMP,RAIN,PEVAP,PC,DPM_RPM, \
-                C_Inp, FYM_Inp, SWC): 
+                C_Inp, FYM_Inp, BC_Inp, SWC): 
             
      
 # Calculate RMFs     
@@ -260,7 +302,7 @@ def RothC(timeFact, DPM,RPM,BIO,HUM,IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_
 # Combine RMF's into one.      
     RateM = RM_TMP*RM_Moist*RM_PC
       
-    decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, Total_Rage, modernC, RateM, clay, C_Inp, FYM_Inp, DPM_RPM)
+    decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, LAB, REC, co2, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, Total_Rage, modernC, RateM, clay, C_Inp, FYM_Inp, BC_Inp, DPM_RPM)
     
    
     return
@@ -280,6 +322,11 @@ BIO = [0.0]
 HUM = [0.0]
 SOC = [0.0]
 
+LAB = [0.0]
+REC = [0.0]
+
+co2 = [0.0]
+
 DPM_Rage = [0.0]
 RPM_Rage = [0.0]
 BIO_Rage = [0.0]
@@ -291,22 +338,22 @@ SWC = [0.0]
 TOC1=0.0
    
 # read in RothC input data file
-df_head = df_head = pd.read_csv('RothC_input.dat', skiprows = 3, header = 0, nrows = 1, index_col=None, delim_whitespace=True) 
+df_head = df_head = pd.read_csv('BCRothC_input.dat', skiprows = 3, header = 0, nrows = 1, index_col=None, sep='\s+') 
 clay = df_head.loc[0,"clay"]
 depth = df_head.loc[0,"depth"]
 IOM = [df_head.loc[0,"iom"]]
 nsteps = df_head.loc[0,"nsteps"]
-df = pd.read_csv('RothC_input.dat', skiprows = 6, header = 0, index_col=None, delim_whitespace=True)
-df.columns =['t_year', 't_month', 't_mod', 't_tmp','t_rain','t_evap', 't_C_Inp', 't_FYM_Inp', 't_PC', 't_DPM_RPM']
+df = pd.read_csv('BCRothC_input.dat', skiprows = 6, header = 0, index_col=None, sep='\s+')
+df.columns =['t_year', 't_month', 't_mod', 't_tmp','t_rain','t_evap', 't_C_Inp', 't_FYM_Inp', 't_BC_Inp', 't_PC', 't_DPM_RPM']
   
        
 # run RothC to equilibrium     
 k = -1
 j = -1
       
-SOC[0] = DPM[0]+RPM[0]+BIO[0]+HUM[0]+IOM[0]
+SOC[0] = DPM[0]+RPM[0]+BIO[0]+HUM[0]+IOM[0]+LAB[0]+REC[0]
 
-print (j, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0])
+print (j, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], LAB[0], REC[0])
 
 timeFact = 12
     
@@ -327,23 +374,24 @@ while (test > 1E-6):
     
     C_Inp = df.t_C_Inp[k]
     FYM_Inp = df.t_FYM_Inp[k]
+    BC_Inp = df.t_BC_Inp[k]
     
     modernC = df.t_mod[k] / 100.0   
 
     Total_Rage=[0.0]
 
-    RothC(timeFact, DPM,RPM,BIO,HUM,IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, Total_Rage, \
-        modernC, clay, depth,TEMP,RAIN,PEVAP,PC,DPM_RPM, C_Inp, FYM_Inp, SWC)  
+    RothC(timeFact, DPM,RPM,BIO,HUM,IOM, SOC, LAB, REC, co2, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, Total_Rage, \
+        modernC, clay, depth,TEMP,RAIN,PEVAP,PC,DPM_RPM, C_Inp, FYM_Inp, BC_Inp, SWC)  
         
     #each a year calculates the difference between previous year and current year (counter =12 monthly model)
     if (np.mod(k+1, timeFact)== 0):
         TOC0 = TOC1
-        TOC1 =DPM[0]+RPM[0]+BIO[0]+HUM[0]
+        TOC1 =DPM[0]+RPM[0]+BIO[0]+HUM[0]+LAB[0]+REC[0]
         test = abs(TOC1-TOC0)            
          
 Total_Delta = (np.exp(-Total_Rage[0]/8035.0) - 1.0) * 1000.0     
       
-#print( j, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], Total_Delta)
+#print( j, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], LAB[0], REC[0], Total_Delta)
 
 year_list = []
 #year_list = [[1, j+1, DPM[0], RPM[0], BIO[0], HUM[0], IOM[0], SOC[0], Total_Delta[0]]]
@@ -361,25 +409,27 @@ for  i in range(timeFact, nsteps):
     
     C_Inp = df.t_C_Inp[i]
     FYM_Inp = df.t_FYM_Inp[i]
+    BC_Inp = df.t_BC_Inp[i]
     
     modernC = df.t_mod[i] / 100.0
     
-    RothC(timeFact, DPM,RPM,BIO,HUM,IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, Total_Rage, \
-          modernC, clay, depth,TEMP,RAIN,PEVAP,PC,DPM_RPM, C_Inp, FYM_Inp, SWC)  
+    RothC(timeFact, DPM,RPM,BIO,HUM,IOM, SOC, LAB, REC, co2, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, Total_Rage, \
+          modernC, clay, depth,TEMP,RAIN,PEVAP,PC,DPM_RPM, C_Inp, FYM_Inp, BC_Inp, SWC)  
          
     Total_Delta = (np.exp(-Total_Rage[0]/8035.0) - 1.0) * 1000.0
     
-    #print(C_Inp, FYM_Inp, TEMP, RAIN, PEVAP, SWC[0],  PC,  DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], SOC[0])
+    #print(C_Inp, FYM_Inp, TEMP, RAIN, PEVAP, SWC[0],  PC,  DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], LAB[0], REC[0], SOC[0])
     
-    month_list.insert(i-timeFact, [df.loc[i,"t_year"],df.loc[i,"t_month"], DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], SOC[0], Total_Delta[0]])
+    month_list.insert(i-timeFact, [df.loc[i,"t_year"],df.loc[i,"t_month"], DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], LAB[0], REC[0], SOC[0], co2[0], Total_Delta[0]])
         
     if(df.t_month[i] == timeFact):
         timeFact_index = int(i/timeFact)   
-        year_list.insert(timeFact_index, [df.loc[i,"t_year"],df.loc[i,"t_month"], DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], SOC[0], Total_Delta[0]])
+        year_list.insert(timeFact_index, [df.loc[i,"t_year"],df.loc[i,"t_month"], DPM[0],RPM[0],BIO[0],HUM[0], IOM[0], LAB[0], REC[0], SOC[0], co2[0], Total_Delta[0]])
         #print( i, DPM, RPM, BIO, HUM, IOM, SOC, Total_Delta)
 
-output_years = pd.DataFrame(year_list, columns=["Year","Month","DPM_t_C_ha","RPM_t_C_ha","BIO_t_C_ha","HUM_t_C_ha","IOM_t_C_ha","SOC_t_C_ha","deltaC"])     
-output_months = pd.DataFrame(month_list, columns=["Year","Month","DPM_t_C_ha","RPM_t_C_ha","BIO_t_C_ha","HUM_t_C_ha","IOM_t_C_ha","SOC_t_C_ha","deltaC"])
+#NOTA: UNITà DI MISURA CO2
+output_years = pd.DataFrame(year_list, columns=["Year","Month","DPM_t_C_ha","RPM_t_C_ha","BIO_t_C_ha","HUM_t_C_ha","IOM_t_C_ha", "BC_LAB_t_C_ha", "BC_REC_t_C_ha", "SOC_t_C_ha", "co2", "deltaC"])     
+output_months = pd.DataFrame(month_list, columns=["Year","Month","DPM_t_C_ha","RPM_t_C_ha","BIO_t_C_ha","HUM_t_C_ha","IOM_t_C_ha", "BC_LAB_t_C_ha", "BC_REC_t_C_ha","SOC_t_C_ha","co2", "deltaC"])
 
 output_years.to_csv("year_results.csv", index = False)
 output_months.to_csv("month_results.csv", index = False)
