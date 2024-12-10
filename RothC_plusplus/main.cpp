@@ -13,7 +13,7 @@ using namespace std;
 // Calculates the plant retainment modifying factor (RMF_PC)
 double RMF_PC(bool PC) {
     double RM_PC;
-    if (! PC) {
+    if (!PC) {
         RM_PC = 1.0;
     } else {
         RM_PC = 0.6;
@@ -23,8 +23,8 @@ double RMF_PC(bool PC) {
 
 // Calculates the rate modifying factor for moisture (RMF_Moist)
 double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, bool PC, double &SWC) {
-    double RMFMax = 1.0;
-    double RMFMin = 0.2;
+    const double RMFMax = 1.0;
+    const double RMFMin = 0.2;
 
     //calc soil water functions properties
     double SMDMax = -(20 + 1.3 * clay - 0.01 * (clay * clay));
@@ -33,6 +33,34 @@ double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, bool PC, 
     double SMDBare = 0.556 * SMDMaxAdj;
 
     double DF = RAIN - 0.75 * PEVAP;
+
+    double minSWCDF = std::min(0.0, SWC + DF);
+    double minSMDBareSWC = std::min(SMDBare, SWC);
+    if (PC) {
+        SWC = std::max(SMDMaxAdj, minSWCDF);
+    } else {
+        SWC = std::max(minSMDBareSWC, minSWCDF);
+    }
+    double RM_Moist;
+    if (SWC > SMD1bar) {
+        RM_Moist = 1.0;
+    } else {
+        RM_Moist = RMFMin + (RMFMax - RMFMin) * (SMDMaxAdj - SWC) / (SMDMaxAdj - SMD1bar);
+    }
+    return RM_Moist;
+}
+
+double RMF_Moist(double monthlyBIC, double clay, double depth, bool PC, double &SWC) {
+    const double RMFMax = 1.0;
+    const double RMFMin = 0.2;
+
+    //calc soil water functions properties
+    double SMDMax = -(20 + 1.3 * clay - 0.01 * (clay * clay));
+    double SMDMaxAdj = SMDMax * depth / 23.0;
+    double SMD1bar = 0.444 * SMDMaxAdj;
+    double SMDBare = 0.556 * SMDMaxAdj;
+
+    double DF = monthlyBIC;
 
     double minSWCDF = std::min(0.0, SWC + DF);
     double minSMDBareSWC = std::min(SMDBare, SWC);
@@ -68,7 +96,7 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
     const double BIO_k = 0.66;
     const double HUM_k = 0.02;
 
-    const double conr = std::log(2.0)/5568.0;
+    const double conr = 0.0001244876401867718; // equivalent to std::log(2.0)/5568.0;
     double tstep = 1.0/timeFact; //monthly 1/12 or daily 1/365
     double exc = std::exp(-conr*tstep);
 
@@ -84,23 +112,27 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
     double HUM_d = HUM - HUM1;
 
     double x = 1.67*(1.85+1.60*std::exp(-0.0786*clay));
-
+    double xPlusPlus = x + 1;
+    double ratioFactor[3];
+    ratioFactor[0] = x / xPlusPlus;
+    ratioFactor[1] = 0.46 / xPlusPlus;
+    ratioFactor[2] = 0.54 / xPlusPlus;
     //proportion C from each pool into CO2, BIO and HUM
-    double DPM_co2 = DPM_d * (x / (x+1));
-    double DPM_BIO = DPM_d * (0.46 / (x+1));
-    double DPM_HUM = DPM_d * (0.54 / (x+1));
+    double DPM_co2 = DPM_d * ratioFactor[0];
+    double DPM_BIO = DPM_d * ratioFactor[1];
+    double DPM_HUM = DPM_d * ratioFactor[2];
 
-    double RPM_co2 = RPM_d * (x / (x+1));
-    double RPM_BIO = RPM_d * (0.46 / (x+1));
-    double RPM_HUM = RPM_d * (0.54 / (x+1));
+    double RPM_co2 = RPM_d * ratioFactor[0];
+    double RPM_BIO = RPM_d * ratioFactor[1];
+    double RPM_HUM = RPM_d * ratioFactor[2];
 
-    double BIO_co2 = BIO_d * (x / (x+1));
-    double BIO_BIO = BIO_d * (0.46 / (x+1));
-    double BIO_HUM = BIO_d * (0.54 / (x+1));
+    double BIO_co2 = BIO_d * ratioFactor[0];
+    double BIO_BIO = BIO_d * ratioFactor[1];
+    double BIO_HUM = BIO_d * ratioFactor[2];
 
-    double HUM_co2 = HUM_d * (x / (x+1));
-    double HUM_BIO = HUM_d * (0.46 / (x+1));
-    double HUM_HUM = HUM_d * (0.54 / (x+1));
+    double HUM_co2 = HUM_d * ratioFactor[0];
+    double HUM_BIO = HUM_d * ratioFactor[1];
+    double HUM_HUM = HUM_d * ratioFactor[2];
 
     //update C pools
     DPM = DPM1;
@@ -192,10 +224,20 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 }
 
 // The Rothamsted Carbon Model: RothC
-void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double clay, double depth, double TEMP, double RAIN, double PEVAP, bool PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
+void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &WATERLOSS,bool isET0, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
     // Calculate RMFs
     double RM_TMP = RMF_Tmp(TEMP);
-    double RM_Moist = RMF_Moist(RAIN, PEVAP, clay, depth, PC, SWC);
+    double RM_Moist;
+    if (isET0)
+    {
+        double monthlyBIC = RAIN - WATERLOSS;
+        RM_Moist = RMF_Moist(monthlyBIC, clay, depth, PC, SWC);
+    }
+    else
+    {
+        RM_Moist = RMF_Moist(RAIN, WATERLOSS, clay, depth, PC, SWC);
+    }
+
     double RM_PC = RMF_PC(PC);
 
     // Combine RMF's into one.
@@ -305,6 +347,7 @@ int main()
     double TEMP;
     double RAIN;
     double PEVAP;
+    bool isET0 = false;
     bool PC;
     double DPM_RPM;
     double C_Inp;
@@ -330,7 +373,7 @@ int main()
 
         Total_Rage = 0;
 
-        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
+        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
 
         if (((k+1)%timeFact) == 0)
         {
@@ -347,13 +390,6 @@ int main()
     std::vector<std::vector<double>> yearList;
 //    std::vector<std::vector<double>> yearList = {{double(1), double(j+1), DPM, RPM, BIO, HUM, IOM, SOC, totalDelta}};
 
-    /*DPM = 0.14546618698414296;
-    RPM = 5.678120858752452;
-    BIO = 0.7405937979752077;
-    HUM = 27.642769420831222;
-    IOM = 3.0041;
-    SOC = 37.211050264543026;
-    totalDelta = -93.34988833;*/
 
     std::vector<std::vector<double>> monthList;
     int timeFactIndex;
@@ -369,7 +405,7 @@ int main()
         FYM_Inp = data[i][7];
         modernC = data[i][2]/100;
 
-        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
+        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
 
         totalDelta = (std::exp(-Total_Rage/8035.0) - 1.0) * 1000;
 
@@ -389,7 +425,7 @@ int main()
     scrivi_csv("C:/Github/rothCStandAlone/CMonthResults.csv", monthList);
     scrivi_csv("C:/Github/rothCStandAlone/CYearResults.csv", yearList);
 
-    return true;
+    return 0;
 
 
 }
