@@ -50,6 +50,34 @@ double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, bool PC, 
     return RM_Moist;
 }
 
+double RMF_Moist(double monthlyBIC, double clay, double depth, bool PC, double &SWC) {
+    const double RMFMax = 1.0;
+    const double RMFMin = 0.2;
+
+    //calc soil water functions properties
+    double SMDMax = -(20 + 1.3 * clay - 0.01 * (clay * clay));
+    double SMDMaxAdj = SMDMax * depth / 23.0;
+    double SMD1bar = 0.444 * SMDMaxAdj;
+    double SMDBare = 0.556 * SMDMaxAdj;
+
+    double DF = monthlyBIC;
+
+    double minSWCDF = std::min(0.0, SWC + DF);
+    double minSMDBareSWC = std::min(SMDBare, SWC);
+    if (PC) {
+        SWC = std::max(SMDMaxAdj, minSWCDF);
+    } else {
+        SWC = std::max(minSMDBareSWC, minSWCDF);
+    }
+    double RM_Moist;
+    if (SWC > SMD1bar) {
+        RM_Moist = 1.0;
+    } else {
+        RM_Moist = RMFMin + (RMFMax - RMFMin) * (SMDMaxAdj - SWC) / (SMDMaxAdj - SMD1bar);
+    }
+    return RM_Moist;
+}
+
 // Calculates the rate modifying factor for temperature (RMF_Tmp)
 double RMF_Tmp(double TEMP) {
     double RM_TMP;
