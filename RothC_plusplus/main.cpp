@@ -224,10 +224,20 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 }
 
 // The Rothamsted Carbon Model: RothC
-void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &PEVAP, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
+void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &WATERLOSS,bool isET0, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
     // Calculate RMFs
     double RM_TMP = RMF_Tmp(TEMP);
-    double RM_Moist = RMF_Moist(RAIN, PEVAP, clay, depth, PC, SWC);
+    double RM_Moist;
+    if (isET0)
+    {
+        double monthlyBIC = RAIN - WATERLOSS;
+        RM_Moist = RMF_Moist(monthlyBIC, clay, depth, PC, SWC);
+    }
+    else
+    {
+        RM_Moist = RMF_Moist(RAIN, WATERLOSS, clay, depth, PC, SWC);
+    }
+
     double RM_PC = RMF_PC(PC);
 
     // Combine RMF's into one.
@@ -337,6 +347,7 @@ int main()
     double TEMP;
     double RAIN;
     double PEVAP;
+    bool isET0 = false;
     bool PC;
     double DPM_RPM;
     double C_Inp;
@@ -362,7 +373,7 @@ int main()
 
         Total_Rage = 0;
 
-        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
+        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
 
         if (((k+1)%timeFact) == 0)
         {
@@ -379,13 +390,6 @@ int main()
     std::vector<std::vector<double>> yearList;
 //    std::vector<std::vector<double>> yearList = {{double(1), double(j+1), DPM, RPM, BIO, HUM, IOM, SOC, totalDelta}};
 
-    /*DPM = 0.14546618698414296;
-    RPM = 5.678120858752452;
-    BIO = 0.7405937979752077;
-    HUM = 27.642769420831222;
-    IOM = 3.0041;
-    SOC = 37.211050264543026;
-    totalDelta = -93.34988833;*/
 
     std::vector<std::vector<double>> monthList;
     int timeFactIndex;
@@ -401,7 +405,7 @@ int main()
         FYM_Inp = data[i][7];
         modernC = data[i][2]/100;
 
-        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
+        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
 
         totalDelta = (std::exp(-Total_Rage/8035.0) - 1.0) * 1000;
 

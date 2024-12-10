@@ -12,6 +12,6 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC,
            double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage,
            double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN,
-           double &PEVAP, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC);
+           double &WATERLOSS, bool isET0, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC);
 
 #endif // ROTHC_PLUSPLUS_H
