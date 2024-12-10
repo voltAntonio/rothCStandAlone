@@ -13,7 +13,7 @@ using namespace std;
 // Calculates the plant retainment modifying factor (RMF_PC)
 double RMF_PC(bool PC) {
     double RM_PC;
-    if (! PC) {
+    if (!PC) {
         RM_PC = 1.0;
     } else {
         RM_PC = 0.6;
@@ -23,8 +23,8 @@ double RMF_PC(bool PC) {
 
 // Calculates the rate modifying factor for moisture (RMF_Moist)
 double RMF_Moist(double RAIN, double PEVAP, double clay, double depth, bool PC, double &SWC) {
-    double RMFMax = 1.0;
-    double RMFMin = 0.2;
+    const double RMFMax = 1.0;
+    const double RMFMin = 0.2;
 
     //calc soil water functions properties
     double SMDMax = -(20 + 1.3 * clay - 0.01 * (clay * clay));
@@ -68,7 +68,7 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
     const double BIO_k = 0.66;
     const double HUM_k = 0.02;
 
-    const double conr = std::log(2.0)/5568.0;
+    const double conr = 0.0001244876401867718; // equivalent to std::log(2.0)/5568.0;
     double tstep = 1.0/timeFact; //monthly 1/12 or daily 1/365
     double exc = std::exp(-conr*tstep);
 
@@ -84,23 +84,27 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
     double HUM_d = HUM - HUM1;
 
     double x = 1.67*(1.85+1.60*std::exp(-0.0786*clay));
-
+    double xPlusPlus = x + 1;
+    double ratioFactor[3];
+    ratioFactor[0] = x / xPlusPlus;
+    ratioFactor[1] = 0.46 / xPlusPlus;
+    ratioFactor[2] = 0.54 / xPlusPlus;
     //proportion C from each pool into CO2, BIO and HUM
-    double DPM_co2 = DPM_d * (x / (x+1));
-    double DPM_BIO = DPM_d * (0.46 / (x+1));
-    double DPM_HUM = DPM_d * (0.54 / (x+1));
+    double DPM_co2 = DPM_d * ratioFactor[0];
+    double DPM_BIO = DPM_d * ratioFactor[1];
+    double DPM_HUM = DPM_d * ratioFactor[2];
 
-    double RPM_co2 = RPM_d * (x / (x+1));
-    double RPM_BIO = RPM_d * (0.46 / (x+1));
-    double RPM_HUM = RPM_d * (0.54 / (x+1));
+    double RPM_co2 = RPM_d * ratioFactor[0];
+    double RPM_BIO = RPM_d * ratioFactor[1];
+    double RPM_HUM = RPM_d * ratioFactor[2];
 
-    double BIO_co2 = BIO_d * (x / (x+1));
-    double BIO_BIO = BIO_d * (0.46 / (x+1));
-    double BIO_HUM = BIO_d * (0.54 / (x+1));
+    double BIO_co2 = BIO_d * ratioFactor[0];
+    double BIO_BIO = BIO_d * ratioFactor[1];
+    double BIO_HUM = BIO_d * ratioFactor[2];
 
-    double HUM_co2 = HUM_d * (x / (x+1));
-    double HUM_BIO = HUM_d * (0.46 / (x+1));
-    double HUM_HUM = HUM_d * (0.54 / (x+1));
+    double HUM_co2 = HUM_d * ratioFactor[0];
+    double HUM_BIO = HUM_d * ratioFactor[1];
+    double HUM_HUM = HUM_d * ratioFactor[2];
 
     //update C pools
     DPM = DPM1;
@@ -389,7 +393,7 @@ int main()
     scrivi_csv("C:/Github/rothCStandAlone/CMonthResults.csv", monthList);
     scrivi_csv("C:/Github/rothCStandAlone/CYearResults.csv", yearList);
 
-    return true;
+    return 0;
 
 
 }
