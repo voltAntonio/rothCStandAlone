@@ -71,7 +71,7 @@ axs[2][2].tick_params(axis='y', labelsize=20)
 
 plt.tight_layout()
 plt.show()
-fig.savefig('month_results.png')
+fig.savefig('month_results.jpg')
 
 df = pd.read_csv('C:/Github/rothCStandAlone/CMonthResults.csv')
 df['Datetime'] = pd.to_datetime(df['Year'].apply(str) + ' ' + df['Month'].apply(str))
@@ -185,7 +185,7 @@ axs[2][2].tick_params(axis='y', labelsize=20)
 
 plt.tight_layout()
 plt.show()
-fig.savefig('year_results.png')
+fig.savefig('year_results.jpg')
 
 df = pd.read_csv('C:/Github/rothCStandAlone/CYearResults.csv')
 df['Datetime'] = pd.to_datetime(df['Year'].apply(str) + ' ' + df['Month'].apply(str))
