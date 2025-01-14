@@ -89,27 +89,40 @@ double RMF_Tmp(double TEMP) {
     return RM_TMP;
 }
 
-void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &RateM, double clay, double C_Inp, double FYM_Inp, double &DPM_RPM)
+void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &LAB, double &REC, double &SOC, double &co2, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &RateM, double clay, double C_Inp, double FYM_Inp, double BIOCHAR_Inp, double &DPM_RPM)
 {
     const double DPM_k = 10.0;
     const double RPM_k = 0.3;
     const double BIO_k = 0.66;
     const double HUM_k = 0.02;
+    const double REC_k = 0.08/RateM;
+    const double LAB_k = 2.55/RateM;
 
     const double conr = 0.0001244876401867718; // equivalent to std::log(2.0)/5568.0;
     double tstep = 1.0/timeFact; //monthly 1/12 or daily 1/365
     double exc = std::exp(-conr*tstep);
+
+    //priming effect factor NOTA
+    double PE;
+    if (LAB > EPSILON || REC > EPSILON)
+        PE = - std::log(0.16);
+    else
+        PE = 1;
 
     //decomposition
     double DPM1 = DPM*std::exp(-RateM*DPM_k*tstep);
     double RPM1 = RPM*std::exp(-RateM*RPM_k*tstep);
     double BIO1 = BIO*std::exp(-RateM*BIO_k*tstep);
     double HUM1 = HUM*std::exp(-RateM*HUM_k*tstep);
+    double LAB1 = LAB*std::exp(-LAB_k*tstep); //NOTA
+    double REC1 = REC*std::exp(-REC_k*tstep); //NOTA
 
     double DPM_d = DPM - DPM1;
     double RPM_d = RPM - RPM1;
     double BIO_d = BIO - BIO1;
     double HUM_d = HUM - HUM1;
+    double LAB_d = LAB - LAB1;
+    double REC_d = REC - REC1;
 
     double x = 1.67*(1.85+1.60*std::exp(-0.0786*clay));
     double xPlusPlus = x + 1;
@@ -134,11 +147,19 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
     double HUM_BIO = HUM_d * ratioFactor[1];
     double HUM_HUM = HUM_d * ratioFactor[2];
 
+    double LAB_co2 = LAB_d;
+    double REC_co2 = REC_d;
+
     //update C pools
     DPM = DPM1;
     RPM = RPM1;
     BIO = BIO1 + DPM_BIO + RPM_BIO + BIO_BIO + HUM_BIO;
     HUM = HUM1 + DPM_HUM + RPM_HUM + BIO_HUM + HUM_HUM;
+
+    LAB = LAB1;
+    REC = REC1;
+
+    co2 = DPM_co2 + RPM_co2 + BIO_co2 + HUM_co2 + LAB_co2 + REC_co2;
 
     //split plant C to DPM and RPM
     double PI_C_DPM = DPM_RPM / (DPM_RPM + 1.0) * C_Inp;
@@ -149,10 +170,16 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
     double FYM_C_RPM = 0.49*FYM_Inp;
     double FYM_C_HUM = 0.02*FYM_Inp;
 
+    double BC_Inp_C_LAB = 0.4*BIOCHAR_Inp;
+    double BC_Inp_C_REC = 0.96*BIOCHAR_Inp;
+
     //add plant C and FYM_C to DPM, RPM and HUM
     DPM = DPM + PI_C_DPM + FYM_C_DPM;
     RPM = RPM + PI_C_RPM + FYM_C_RPM;
     HUM = HUM + FYM_C_HUM;
+
+    LAB = LAB + BC_Inp_C_LAB;
+    REC = REC + BC_Inp_C_REC;
 
     //calc new ract of each pool
     double DPM_Ract = DPM1 * std::exp(-conr*DPM_Rage);
@@ -188,7 +215,7 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 
     double HUM_Ract_new = FYM_HUM_Ract + (HUM_Ract + DPM_HUM_Ract + RPM_HUM_Ract + BIO_HUM_Ract + HUM_HUM_Ract)*exc;
 
-    SOC = DPM + RPM + BIO + HUM + IOM;
+    SOC = DPM + RPM + BIO + HUM + IOM + LAB + REC;
     double Total_Ract = DPM_Ract_new + RPM_Ract_new + BIO_Ract_new + HUM_Ract_new + IOM_Ract;
 
     //calculate rage of each pool
@@ -224,7 +251,7 @@ void decomp(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, do
 }
 
 // The Rothamsted Carbon Model: RothC
-void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &SOC, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &WATERLOSS,bool isET0, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double &SWC) {
+void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, double &IOM, double &LAB, double &REC, double &SOC, double &co2, double &DPM_Rage, double &RPM_Rage, double &BIO_Rage, double &HUM_Rage, double &IOM_Rage, double &Total_Rage, double &modernC, double &clay, double &depth, double &TEMP, double &RAIN, double &WATERLOSS,bool isET0, bool &PC, double &DPM_RPM, double C_Inp, double FYM_Inp, double BIOCHAR_Inp, double &SWC) {
     // Calculate RMFs
     double RM_TMP = RMF_Tmp(TEMP);
     double RM_Moist;
@@ -243,7 +270,7 @@ void RothC(int timeFact, double &DPM, double &RPM, double &BIO, double &HUM, dou
     // Combine RMF's into one.
     double RateM = RM_TMP * RM_Moist * RM_PC;
 
-    decomp(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, RateM, clay, C_Inp, FYM_Inp, DPM_RPM);
+    decomp(timeFact, DPM, RPM, BIO, HUM, IOM, LAB, REC, SOC, co2, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, RateM, clay, C_Inp, FYM_Inp, BIOCHAR_Inp, DPM_RPM);
 
     return;
 }
@@ -267,7 +294,7 @@ std::vector<std::vector<double>> leggi_csv(const std::string& nome_file) {
         std::istringstream ss(linea);
         std::string token;
 
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 11; ++i) {
             std::getline(ss, token, ',');
             try {
                 riga.push_back(std::stod(token));
@@ -290,7 +317,7 @@ void scrivi_csv(const std::string& nome_file, const std::vector<std::vector<doub
         return;
     }
 
-    file << "index,Year,Month,DPM_t_C_ha,RPM_t_C_ha,BIO_t_C_ha,HUM_t_C_ha,IOM_t_C_ha,SOC_t_C_ha,deltaC" << std::endl;
+    file << "patate,Year,Month,DPM_t_C_ha,RPM_t_C_ha,BIO_t_C_ha,HUM_t_C_ha,IOM_t_C_ha,BC_LAB_t_C_ha,BC_REC_t_C_ha,SOC_t_C_ha,deltaC,co2" << std::endl;
 
     for (const auto& riga : dati) {
         std::stringstream ss;
@@ -332,7 +359,7 @@ int main()
     int nsteps = 840;       //[-]
 
     //std::vector<std::vector<double>> data = createDataMatrix();
-    std::vector<std::vector<double>> data = leggi_csv("C:/Github/rothCStandAlone/data_input.csv");
+    std::vector<std::vector<double>> data = leggi_csv("C:/Github/rothCStandAlone/C_data_input.csv");
 
     int k = -1;
     int j = -1;
@@ -353,6 +380,10 @@ int main()
     double C_Inp;
     double FYM_Inp;
     double modernC;
+    double BIOCHAR_Inp;
+    double co2 = 0;
+    double LAB = 0;
+    double REC = 0;
 
     double test = 100;
     while (test > 0.000001)
@@ -365,15 +396,16 @@ int main()
         TEMP = data[k][3];
         RAIN = data[k][4];
         PEVAP = data[k][5];
-        PC = bool(data[k][8]);
-        DPM_RPM = data[k][9];
+        PC = bool(data[k][9]);
+        DPM_RPM = data[k][10];
         C_Inp = data[k][6];
         FYM_Inp = data[k][7];
+        BIOCHAR_Inp = data[k][8];
         modernC = data[k][2]/100;
 
         Total_Rage = 0;
 
-        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
+        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, LAB, REC, SOC, co2, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, BIOCHAR_Inp, SWC);
 
         if (((k+1)%timeFact) == 0)
         {
@@ -399,25 +431,26 @@ int main()
         TEMP = data[i][3];
         RAIN = data[i][4];
         PEVAP = data[i][5];
-        PC = bool(data[i][8]);
-        DPM_RPM = data[i][9];
+        PC = bool(data[i][9]);
+        DPM_RPM = data[i][10];
         C_Inp = data[i][6];
         FYM_Inp = data[i][7];
+        BIOCHAR_Inp = data[i][8];
         modernC = data[i][2]/100;
 
-        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, SOC, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, SWC);
+        RothC(timeFact, DPM, RPM, BIO, HUM, IOM, LAB, REC, SOC, co2, DPM_Rage, RPM_Rage, BIO_Rage, HUM_Rage, IOM_Rage, Total_Rage, modernC, clay, depth, TEMP, RAIN, PEVAP, isET0, PC, DPM_RPM, C_Inp, FYM_Inp, BIOCHAR_Inp, SWC);
 
         totalDelta = (std::exp(-Total_Rage/8035.0) - 1.0) * 1000;
 
         //std::cout << C_Inp << "," << FYM_Inp << "," << TEMP << "," << RAIN << "," << PEVAP << "," << SWC << ","
                   //<< PC << "," << DPM <<"," << RPM <<"," << BIO <<"," << HUM <<"," << IOM <<"," << SOC << "\n";
 
-        monthList.push_back({double(i-timeFact), double(data[i][0]), double(data[i][1]), DPM, RPM, BIO, HUM, IOM, SOC, totalDelta});
+        monthList.push_back({double(i-timeFact), double(data[i][0]), double(data[i][1]), DPM, RPM, BIO, HUM, IOM, LAB, REC, SOC, totalDelta, co2});
 
         if (int(data[i][1]) == timeFact)
         {
             timeFactIndex = int(i/timeFact);
-            yearList.push_back({double(timeFactIndex), data[i][0], data[i][1], DPM, RPM, BIO, HUM, IOM, SOC, totalDelta});
+            yearList.push_back({double(timeFactIndex), data[i][0], data[i][1], DPM, RPM, BIO, HUM, IOM, LAB, REC, SOC, totalDelta, co2});
             //std::cout << i << "," << DPM << "," << RPM << "," << BIO << "," << HUM << "," << IOM << "," << SOC << "," << totalDelta << "\n";
         }
     }

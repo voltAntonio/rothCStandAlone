@@ -191,7 +191,7 @@ def decomp(timeFact, DPM,RPM,BIO,HUM, IOM, SOC, LAB, REC, co2, DPM_Rage, RPM_Rag
     BIO[0] = BIO1 + DPM_BIO + RPM_BIO + BIO_BIO + HUM_BIO
     HUM[0] = HUM1 + DPM_HUM + RPM_HUM + BIO_HUM + HUM_HUM    
     
-    LAB[0] = LAB1
+    LAB[0] = LAB1 #o LAB_D?
     REC[0] = REC1
     
     co2[0] = DPM_co2 + RPM_co2 + BIO_co2 + HUM_co2 + LAB_co2 + REC_co2
